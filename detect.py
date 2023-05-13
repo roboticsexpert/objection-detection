@@ -1,6 +1,6 @@
 import matplotlib
-matplotlib.use('Agg')
 
+matplotlib.use('Agg')
 
 import argparse
 import time
@@ -14,17 +14,19 @@ from random import randint
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages
 from utils.general import check_img_size, check_requirements, \
-                check_imshow, non_max_suppression, apply_classifier, \
-                scale_coords, xyxy2xywh, strip_optimizer, set_logging, \
-                increment_path
+    check_imshow, non_max_suppression, apply_classifier, \
+    scale_coords, xyxy2xywh, strip_optimizer, set_logging, \
+    increment_path
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 from utils.download_weights import download
 
+
 def detect(save_img=False):
-    source, weights, view_img, save_txt, imgsz, trace,blur = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace,opt.blur
+    source, weights, view_img, save_txt, imgsz, trace, blur = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace, opt.blur
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
-    webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://')) or source.lower().startswith(('/dev/video'))
+    webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
+        ('rtsp://', 'rtmp://', 'http://', 'https://')) or source.lower().startswith(('/dev/video'))
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
@@ -34,7 +36,6 @@ def detect(save_img=False):
     set_logging()
     device = select_device(opt.device)
     half = device.type != 'cpu'  # half precision only supported on CUDA
-
 
     # Load model
     print("Loading model")
@@ -74,48 +75,44 @@ def detect(save_img=False):
     old_img_w = old_img_h = imgsz
     old_img_b = 1
 
-    
-
-   
     for path, img, im0s, vid_cap in dataset:
 
-        t0 = time.time()    
-    
+        t0 = time.time()
+
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
 
-        tStart=time.time()
-    
+        tStart = time.time()
 
         # Warmup
-        
-        
-        if device.type != 'cpu' and (old_img_b != img.shape[0] or old_img_h != img.shape[2] or old_img_w != img.shape[3]):
+
+        if device.type != 'cpu' and (
+                old_img_b != img.shape[0] or old_img_h != img.shape[2] or old_img_w != img.shape[3]):
             old_img_b = img.shape[0]
             old_img_h = img.shape[2]
             old_img_w = img.shape[3]
             for i in range(3):
                 model(img, augment=opt.augment)[0]
-        tWarmup=time.time()
+        tWarmup = time.time()
 
         # Inference
         pred = model(img, augment=opt.augment)[0]
-        tInference=time.time()
+        tInference = time.time()
 
         # Apply NMS
-        
+
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
-        tNMS=time.time()
+        tNMS = time.time()
 
         # Apply Classifier
         tClassifier = time_synchronized()
-        
+
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
-        tClassify=time.time()
+        tClassify = time.time()
 
         # Process detections    
         for i, det in enumerate(pred):  # detections per image
@@ -141,13 +138,13 @@ def detect(save_img=False):
                 for *xyxy, conf, cls in reversed(det):
 
                     if blur:
-                        #Add Object Blurring Code
-                        #..................................................................
-                        crop_obj = im0[int(xyxy[1]):int(xyxy[3]),int(xyxy[0]):int(xyxy[2])]
-                        blur = cv2.blur(crop_obj,(60,60))
-                        im0[int(xyxy[1]):int(xyxy[3]),int(xyxy[0]):int(xyxy[2])] = blur
-                        #..................................................................
-                   
+                        # Add Object Blurring Code
+                        # ..................................................................
+                        crop_obj = im0[int(xyxy[1]):int(xyxy[3]), int(xyxy[0]):int(xyxy[2])]
+                        blur = cv2.blur(crop_obj, (60, 60))
+                        im0[int(xyxy[1]):int(xyxy[3]), int(xyxy[0]):int(xyxy[2])] = blur
+                        # ..................................................................
+
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
@@ -155,25 +152,23 @@ def detect(save_img=False):
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
                     if save_img or view_img:  # Add bbox to image
-                        tmp=names[int(cls)]
-                        if names[int(cls)]=="boat":
-                            tmp="boat"
+                        tmp = names[int(cls)]
+                        if names[int(cls)] == "boat":
+                            tmp = "ship"
 
                         label = f'{tmp} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
-                        
-            tImage=time.time()
 
-        
+            tImage = time.time()
+
             # Show results
             if view_img:
-                cv2.imshow(str(p), im0)
+                cv2.imshow(str(p), cv2.resize(im0, (800, 600)))
                 if cv2.waitKey(1) == ord('q'):  # q to quit
-                  cv2.destroyAllWindows()
-                  raise StopIteration
+                    cv2.destroyAllWindows()
+                    raise StopIteration
 
-            tShow=time.time()
-            
+            tShow = time.time()
 
             # Save results (image with detections)
             if save_img:
@@ -194,15 +189,15 @@ def detect(save_img=False):
                             save_path += '.mp4'
                         vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     vid_writer.write(im0)
-            
+
             # Print time (inference + NMS)
             tFinish = time_synchronized()
-            print(f'{s} Started:({(1E3 * (tStart - t0)):.1f}ms), Warmedup({(1E3 * (tWarmup-tStart )):.1f}ms), Inference:({(1E3 * (tInference-tWarmup )):.1f}ms), NMS:({(1E3 * (tNMS- tInference )):.1f}ms), Classify:({(1E3 * (tClassify-tNMS )):.1f}ms), Image:({(1E3 * (tImage-tNMS)):.1f}ms), Show:({(1E3 * (tShow-tNMS)):.1f}ms) and ALL:({(1E3 * (tFinish - t0)):.1f}ms) in {time.time()}')
-            
+            print(
+                f'{s} Started:({(1E3 * (tStart - t0)):.1f}ms), Warmedup({(1E3 * (tWarmup - tStart)):.1f}ms), Inference:({(1E3 * (tInference - tWarmup)):.1f}ms), NMS:({(1E3 * (tNMS - tInference)):.1f}ms), Classify:({(1E3 * (tClassify - tNMS)):.1f}ms), Image:({(1E3 * (tImage - tNMS)):.1f}ms), Show:({(1E3 * (tShow - tNMS)):.1f}ms) and ALL:({(1E3 * (tFinish - t0)):.1f}ms) in {time.time()}')
 
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
-        #print(f"Results saved to {save_dir}{s}")
+        # print(f"Results saved to {save_dir}{s}")
 
     print(f'Done. ({time.time() - t0:.3f}s)')
 
@@ -234,14 +229,10 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     print(opt)
 
-
-    
-
-
-    #check_requirements(exclude=('pycocotools', 'thop'))
+    # check_requirements(exclude=('pycocotools', 'thop'))
     if opt.download and not os.path.exists(str(opt.weights[0])):
-        print (opt.weights[0])
-        print (os.path.exists(opt.weights[0]))
+        print(opt.weights[0])
+        print(os.path.exists(opt.weights[0]))
         print('Model weights not found. Attempting to download now...')
         raise Exception("Exception")
         exit
